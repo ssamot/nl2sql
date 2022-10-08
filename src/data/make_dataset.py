@@ -1,30 +1,229 @@
-# -*- coding: utf-8 -*-
+import torch
+import transformers
+from transformers import T5Tokenizer, T5EncoderModel, T5Config
+transformers.logging.set_verbosity_error()
+import numpy as np
+from datasets import load_dataset
+import random, warnings
+warnings.filterwarnings("ignore")
 import click
-import logging
-from pathlib import Path
-from dotenv import find_dotenv, load_dotenv
+from tensorflow.keras.utils import pad_sequences
+
+
+np.set_printoptions(suppress=True)
+np.set_printoptions(precision=2)
+
+
+class T5:
+    def __init__(self, name = 'google/t5-v1_1-base', max_length = 100):
+        self.T5_CONFIGS = {}
+        self.MAX_LENGTH = max_length
+        self.model, self.tokenizer = self.get_model_and_tokenizer(name)
+
+
+    def t5_encode_text(self, texts):
+        t5, tokenizer = self.model, self.tokenizer
+
+        if torch.cuda.is_available():
+            t5 = t5.cuda()
+
+        device = next(t5.parameters()).device
+
+        encoded = tokenizer.batch_encode_plus(
+            texts,
+            return_tensors="pt",
+            #max_length=self.MAX_LENGTH,
+            truncation=True,
+            pad_to_max_length = True,
+            add_special_tokens=False
+            #return_special_tokens_mask = True
+        )
+
+        input_ids = encoded.input_ids.to(device)
+        attn_mask = encoded.attention_mask.to(device)
+
+        t5.eval()
+
+        with torch.no_grad():
+            output = t5(input_ids=input_ids, attention_mask=attn_mask)
+            encoded_text = output.last_hidden_state.detach()
+
+        encoded_text = encoded_text.detach().numpy()
+        encoded_text[:,:,:] = attn_mask[:,:,np.newaxis] * encoded_text[:,:,:]
+
+        return encoded_text
+
+
+    def get_tokenizer(self, name):
+        tokenizer = T5Tokenizer.from_pretrained(name, local_files_only=True)
+        return tokenizer
+
+
+    def get_model(self, name):
+        model = T5EncoderModel.from_pretrained(name, local_files_only=True)
+        return model
+
+
+    def get_model_and_tokenizer(self,name):
+        T5_CONFIGS = self.T5_CONFIGS
+
+        if name not in T5_CONFIGS:
+            T5_CONFIGS[name] = dict()
+        if "model" not in T5_CONFIGS[name]:
+            T5_CONFIGS[name]["model"] = self.get_model(name)
+        if "tokenizer" not in T5_CONFIGS[name]:
+            T5_CONFIGS[name]["tokenizer"] = self.get_tokenizer(name)
+
+        return T5_CONFIGS[name]['model'], T5_CONFIGS[name]['tokenizer']
+
+
+    def get_encoded_dim(self,name):
+        T5_CONFIGS = self.T5_CONFIGS
+        if name not in T5_CONFIGS:
+            # avoids loading the model if we only want to get the dim
+            config = T5Config.from_pretrained(name)
+            T5_CONFIGS[name] = dict(config=config)
+        elif "config" in T5_CONFIGS[name]:
+            config = T5_CONFIGS[name]["config"]
+        elif "model" in T5_CONFIGS[name]:
+            config = T5_CONFIGS[name]["model"].config
+        else:
+            assert False
+        return config.d_model
+
+
+
+def encode_header(table, header_dict):
+    headers_encoded = []
+    for h in table:
+        enc_head = []
+        for c in h["header"]:
+            enc_head.extend(header_dict[c])
+        enc_head = np.array(enc_head)
+        headers_encoded.append(enc_head)
+
+
+
+    #headers_encoded = np.array(headers_encoded)
+    return headers_encoded
+
+def encode_selagg(sql):
+    selagg_enc = []
+    for k in sql:
+        selagg_enc.append([k["sel"], k["agg"]])
+    selagg_enc = np.array(selagg_enc)
+    return selagg_enc
+
+def encode_conds(sql, questions):
+    all_encs = []
+    maximum_length = -1
+    for i in range(len(sql)):
+        start = [10]
+        end = [11]
+        comma = [12]
+        dash = [13]
+
+        ci = sql[i]["conds"]["column_index"]
+        oi = sql[i]["conds"]["operator_index"]
+        co = sql[i]["conds"]["condition"]
+
+        encoded_conds = [
+            start,
+        ]
+
+        for j in range(len(co)):
+            index = questions[i].upper().index(co[j].upper())
+            # print(index, index+len(co[j].upper()) )
+
+            index_start = [[int(x)] for x in str(index).zfill(3)]
+            index_end = [[int(x)] for x in
+                         str(index + len(co[j].upper())).zfill(3)]
+
+            encoded_conds.extend([
+                [ci[j]],
+                [oi[j]], ])
+            encoded_conds.extend(index_start)
+            encoded_conds.append(dash)
+            encoded_conds.extend(index_end)
+            encoded_conds.append(comma)
+        encoded_conds.append(end)
+        if (len(encoded_conds) > maximum_length):
+            maximum_length = len(encoded_conds)
+        all_encs.append(encoded_conds)
+    return all_encs
 
 
 @click.command()
-@click.argument('input_filepath', type=click.Path(exists=True))
-@click.argument('output_filepath', type=click.Path())
-def main(input_filepath, output_filepath):
-    """ Runs data processing scripts to turn raw data from (../raw) into
-        cleaned data ready to be analyzed (saved in ../processed).
-    """
-    logger = logging.getLogger(__name__)
-    logger.info('making final data set from raw data')
+@click.argument('output_filepath', type=click.Path(exists=True))
+def main(output_filepath):
+
+    Tfive = T5()
+
+    max_length = 100
+    dataset = load_dataset('wikisql')
+
+    train_questions = dataset["train"]["question"][:max_length]
+    validation_questions = dataset["validation"]["question"][:max_length]
+    test_questions = dataset["test"]["question"][:max_length]
+
+    train_table = dataset["train"]["table"][:max_length]
+    validation_table = dataset["validation"]["table"][:max_length]
+    test_table = dataset["test"]["table"][:max_length]
+
+    train_sql = dataset["train"]["sql"][:max_length]
+    validation_sql = dataset["validation"]["sql"][:max_length]
+    test_sql = dataset["test"]["sql"][:max_length]
+
+    headers = []
+    for d in train_table, validation_table, test_table:
+        for t in d:
+            headers.extend(t["header"])
+    headers = list(set(headers))
+
+    headers_encoded = []
+    for h in headers:
+        h_e = Tfive.t5_encode_text([h])
+        headers_encoded.append(h_e[0])
+
+    header_dict = dict(zip(headers, headers_encoded))
+
+    map = {
+        "train":[train_questions, train_table, train_sql ],
+        "validation": [ validation_questions, validation_table, validation_sql],
+        "test": [ test_questions, test_table, test_sql]
+    }
+
+
+    for dataset in ["train", "validation", "test"]:
+
+        print(dataset)
+        questions, table, sql = map[dataset]
+
+        headers_encoded = encode_header(table, header_dict)
+        headers_encoded = pad_sequences(headers_encoded, padding='post')
+
+        selagg_encoded = encode_selagg(sql)
+
+        conditions_encoded = encode_conds(sql, questions)
+        conditions_encoded = pad_sequences(conditions_encoded,padding='post')
+
+        questions_encoded = Tfive.t5_encode_text(questions)
+
+        np.savez(f"{output_filepath}/{dataset}.npz",
+                 selagg_encoded=selagg_encoded,
+                 questions_encoded = questions_encoded,
+                 headers_encoded = headers_encoded,
+                 conditions_encoded = conditions_encoded)
+
+
+        print(selagg_encoded.shape, "selagg_encoded")
+        print(questions_encoded.shape, "questions_encoded")
+        print(headers_encoded.shape, "headers_encoded")
+        print(conditions_encoded.shape, "conditions_encoded" )
+
+
 
 
 if __name__ == '__main__':
-    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    logging.basicConfig(level=logging.INFO, format=log_fmt)
-
-    # not used in this stub but often useful for finding various files
-    project_dir = Path(__file__).resolve().parents[2]
-
-    # find .env automagically by walking up directories until it's found, then
-    # load up the .env entries as environment variables
-    load_dotenv(find_dotenv())
-
     main()
+
