@@ -107,21 +107,21 @@ def encode_header(table, header_dict):
     #headers_encoded = np.array(headers_encoded)
     return headers_encoded
 
-def encode_selagg(sql):
-    selagg_enc = []
-    for k in sql:
-        selagg_enc.append([k["sel"], k["agg"]])
-    selagg_enc = np.array(selagg_enc)
-    return selagg_enc
+# def encode_selagg(sql):
+#     selagg_enc = []
+#     for k in sql:
+#         selagg_enc.append([k["sel"], k["agg"]])
+#     selagg_enc = np.array(selagg_enc)
+#     return selagg_enc
 
 def encode_conds(sql, questions):
     all_encs = []
     maximum_length = -1
     for i in range(len(sql)):
-        start = [10]
-        end = [11]
-        comma = [12]
-        dash = [13]
+        start = [11]
+        end = [12]
+        comma = [13]
+        dash = [14]
 
         ci = sql[i]["conds"]["column_index"]
         oi = sql[i]["conds"]["operator_index"]
@@ -129,23 +129,26 @@ def encode_conds(sql, questions):
 
         encoded_conds = [
             start,
+            [sql[i]["sel"] + 1],
+            [sql[i]["agg"] + 1]
         ]
 
         for j in range(len(co)):
             index = questions[i].upper().index(co[j].upper())
             # print(index, index+len(co[j].upper()) )
 
-            index_start = [[int(x)] for x in str(index).zfill(3)]
-            index_end = [[int(x)] for x in
+            index_start = [[int(x) + 1] for x in str(index).zfill(3)]
+            index_end = [[int(x) + 1] for x in
                          str(index + len(co[j].upper())).zfill(3)]
 
             encoded_conds.extend([
-                [ci[j]],
-                [oi[j]], ])
+                [ci[j] + 1],
+                [oi[j] + 1], ])
             encoded_conds.extend(index_start)
             encoded_conds.append(dash)
             encoded_conds.extend(index_end)
-            encoded_conds.append(comma)
+            if(j!=len(co)-1):
+                encoded_conds.append(comma)
         encoded_conds.append(end)
         if (len(encoded_conds) > maximum_length):
             maximum_length = len(encoded_conds)
@@ -202,24 +205,23 @@ def main(output_filepath):
         headers_encoded = encode_header(table, header_dict)
         headers_encoded = pad_sequences(headers_encoded, padding='post')
 
-        selagg_encoded = encode_selagg(sql)
 
-        conditions_encoded = encode_conds(sql, questions)
-        conditions_encoded = pad_sequences(conditions_encoded,padding='post')
+        output_encoded = encode_conds(sql, questions)
+        output_encoded = pad_sequences(output_encoded,padding='post')
 
         questions_encoded = Tfive.t5_encode_text(questions)
 
+        
+
         np.savez(f"{output_filepath}/{dataset}.npz",
-                 selagg_encoded=selagg_encoded,
                  questions_encoded = questions_encoded,
                  headers_encoded = headers_encoded,
-                 conditions_encoded = conditions_encoded)
+                 output_encoded = output_encoded)
 
 
-        print(selagg_encoded.shape, "selagg_encoded")
         print(questions_encoded.shape, "questions_encoded")
         print(headers_encoded.shape, "headers_encoded")
-        print(conditions_encoded.shape, "conditions_encoded" )
+        print(output_encoded.shape, "output_encoded" )
 
 
 
