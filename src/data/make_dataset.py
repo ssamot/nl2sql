@@ -37,6 +37,7 @@ class T5:
             pad_to_max_length = True,
             add_special_tokens=False
             #return_special_tokens_mask = True
+
         )
 
         input_ids = encoded.input_ids.to(device)
@@ -93,13 +94,18 @@ class T5:
 
 
 
-def encode_header(table, header_dict):
+def encode_header(table, header_dict, comma, end):
     headers_encoded = []
+    #print(comma.shape)
+    #exit()
     for h in table:
         enc_head = []
         for c in h["header"]:
             enc_head.extend(header_dict[c])
+            #enc_head.extend(comma)
+        enc_head.extend(end)
         enc_head = np.array(enc_head)
+        #print(enc_head.shape)
         headers_encoded.append(enc_head)
 
 
@@ -196,32 +202,48 @@ def main(output_filepath):
         "test": [ test_questions, test_table, test_sql]
     }
 
+    comma = Tfive.t5_encode_text([","])[0]
+    end = Tfive.t5_encode_text(["hend"])[0]
 
     for dataset in ["train", "validation", "test"]:
 
         print(dataset)
         questions, table, sql = map[dataset]
+        #exit()
+        questions_encoded = Tfive.t5_encode_text(questions)
+        #exit()
 
-        headers_encoded = encode_header(table, header_dict)
-        headers_encoded = pad_sequences(headers_encoded, padding='post')
+        headers_encoded = encode_header(table, header_dict, comma, end)
+        #headers_encoded = pad_sequences(headers_encoded, padding='post')
 
+
+
+
+
+        headers_questions_encoded = []
+        for i,q in enumerate(questions_encoded):
+            f = np.concatenate([headers_encoded[i], q], axis = 0)
+            headers_questions_encoded.append(f)
+
+        headers_questions_encoded = pad_sequences(headers_questions_encoded,padding='post')
+        #print(everything.shape)
+        #exit()
 
         output_encoded = encode_conds(sql, questions)
-        output_encoded = pad_sequences(output_encoded,padding='post')
-
-        questions_encoded = Tfive.t5_encode_text(questions)
-
-        
+        output_encoded = pad_sequences(output_encoded, padding='post',
+                                       maxlen=headers_questions_encoded.shape[1])
 
         np.savez(f"{output_filepath}/{dataset}.npz",
-                 questions_encoded = questions_encoded,
-                 headers_encoded = headers_encoded,
-                 output_encoded = output_encoded)
+                 #questions_encoded = questions_encoded,
+                 #headers_encoded = headers_encoded,
+                 output_encoded = output_encoded,
+                 headers_questions_encoded = headers_questions_encoded )
 
 
-        print(questions_encoded.shape, "questions_encoded")
-        print(headers_encoded.shape, "headers_encoded")
+        print(headers_questions_encoded.shape, "questions_encoded")
+        #print(headers_encoded.shape, "headers_encoded")
         print(output_encoded.shape, "output_encoded" )
+        #print()
 
 
 

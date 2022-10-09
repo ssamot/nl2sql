@@ -29,6 +29,11 @@ endif
 data: requirements
 	$(PYTHON_INTERPRETER) src/data/make_dataset.py data/processed
 
+
+## Train
+train: requirements
+	$(PYTHON_INTERPRETER) src/models/train_model.py data/processed models
+
 ## Delete all compiled Python files
 clean:
 	find . -type f -name "*.py[co]" -delete
