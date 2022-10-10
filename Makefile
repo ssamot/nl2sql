@@ -27,12 +27,17 @@ endif
 
 ## Make Dataset
 data: requirements
-	$(PYTHON_INTERPRETER) src/data/make_dataset.py data/processed
+	CUDA_VISIBLE_DEVICES="" $(PYTHON_INTERPRETER) src/data/make_dataset.py data/processed
 
 
 ## Train
 train: requirements
 	$(PYTHON_INTERPRETER) src/models/train_model.py data/processed models
+
+## Train
+predict: requirements
+	$(PYTHON_INTERPRETER) src/models/predict_model.py data/processed models
+
 
 ## Delete all compiled Python files
 clean:

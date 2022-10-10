@@ -55,13 +55,37 @@ class T5:
         return encoded_text
 
 
+    def t5_tokenize_text(self, texts):
+        t5, tokenizer = self.model, self.tokenizer
+
+        if torch.cuda.is_available():
+            t5 = t5.cuda()
+
+        device = next(t5.parameters()).device
+
+        encoded = tokenizer.batch_encode_plus(
+            texts,
+            return_tensors="pt",
+            #max_length=self.MAX_LENGTH,
+            truncation=True,
+            pad_to_max_length = True,
+            add_special_tokens=False
+            #return_special_tokens_mask = True
+
+        )
+
+        input_ids = encoded.input_ids.to(device)
+
+        return input_ids.detach().numpy()
+
+
     def get_tokenizer(self, name):
-        tokenizer = T5Tokenizer.from_pretrained(name, local_files_only=True)
+        tokenizer = T5Tokenizer.from_pretrained(name, local_files_only=False)
         return tokenizer
 
 
     def get_model(self, name):
-        model = T5EncoderModel.from_pretrained(name, local_files_only=True)
+        model = T5EncoderModel.from_pretrained(name, local_files_only=False)
         return model
 
 
@@ -102,7 +126,7 @@ def encode_header(table, header_dict, comma, end):
         enc_head = []
         for c in h["header"]:
             enc_head.extend(header_dict[c])
-            #enc_head.extend(comma)
+            enc_head.extend(comma)
         enc_head.extend(end)
         enc_head = np.array(enc_head)
         #print(enc_head.shape)
@@ -120,7 +144,7 @@ def encode_header(table, header_dict, comma, end):
 #     selagg_enc = np.array(selagg_enc)
 #     return selagg_enc
 
-def encode_conds(sql, questions):
+def encode_conds(sql, questions, Tfive):
     all_encs = []
     maximum_length = -1
     for i in range(len(sql)):
@@ -140,19 +164,25 @@ def encode_conds(sql, questions):
         ]
 
         for j in range(len(co)):
-            index = questions[i].upper().index(co[j].upper())
-            # print(index, index+len(co[j].upper()) )
+            # index = questions[i].upper().index(co[j].upper())
+            # # print(index, index+len(co[j].upper()) )
+            #
+            # index_start = [[int(x) + 1] for x in str(index).zfill(3)]
+            # index_end = [[int(x) + 1] for x in
+            #              str(index + len(co[j].upper())).zfill(3)]
 
-            index_start = [[int(x) + 1] for x in str(index).zfill(3)]
-            index_end = [[int(x) + 1] for x in
-                         str(index + len(co[j].upper())).zfill(3)]
+            co_t = Tfive.t5_tokenize_text([co[j]]) + 20
+            co_t = [[c] for c in co_t[0]]
+            #print(co_t, co_t.T.shape)
+            #exit()
 
             encoded_conds.extend([
                 [ci[j] + 1],
                 [oi[j] + 1], ])
-            encoded_conds.extend(index_start)
-            encoded_conds.append(dash)
-            encoded_conds.extend(index_end)
+            encoded_conds.extend(co_t)
+            # encoded_conds.extend(index_start)
+            # encoded_conds.append(dash)
+            # encoded_conds.extend(index_end)
             if(j!=len(co)-1):
                 encoded_conds.append(comma)
         encoded_conds.append(end)
@@ -225,11 +255,11 @@ def main(output_filepath):
             f = np.concatenate([headers_encoded[i], q], axis = 0)
             headers_questions_encoded.append(f)
 
-        headers_questions_encoded = pad_sequences(headers_questions_encoded,padding='post')
+        headers_questions_encoded = pad_sequences(headers_questions_encoded,padding='post', maxlen=110)
         #print(everything.shape)
         #exit()
 
-        output_encoded = encode_conds(sql, questions)
+        output_encoded = encode_conds(sql, questions, Tfive)
         output_encoded = pad_sequences(output_encoded, padding='post',
                                        maxlen=headers_questions_encoded.shape[1])
 
