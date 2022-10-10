@@ -36,7 +36,7 @@ train: requirements
 
 ## Train
 predict: requirements
-	$(PYTHON_INTERPRETER) src/models/predict_model.py data/processed models
+	PYTHONPATH=src $(PYTHON_INTERPRETER) src/models/predict_model.py data/processed models
 
 
 ## Delete all compiled Python files

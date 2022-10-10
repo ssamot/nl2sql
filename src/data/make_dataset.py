@@ -8,6 +8,7 @@ import random, warnings
 warnings.filterwarnings("ignore")
 import click
 from tensorflow.keras.utils import pad_sequences
+import re
 
 
 np.set_printoptions(suppress=True)
@@ -148,10 +149,11 @@ def encode_conds(sql, questions, Tfive):
     all_encs = []
     maximum_length = -1
     for i in range(len(sql)):
-        start = [11]
-        end = [12]
-        comma = [13]
-        dash = [14]
+        start = [1]
+        end = [2]
+        comma = [3]
+        dash = [4]
+        offset = 10
 
         ci = sql[i]["conds"]["column_index"]
         oi = sql[i]["conds"]["operator_index"]
@@ -159,32 +161,67 @@ def encode_conds(sql, questions, Tfive):
 
         encoded_conds = [
             start,
-            [sql[i]["sel"] + 1],
-            [sql[i]["agg"] + 1]
+            [sql[i]["sel"] + offset],
+            [sql[i]["agg"] + offset]
         ]
 
+        #print(sql[i])
         for j in range(len(co)):
-            # index = questions[i].upper().index(co[j].upper())
-            # # print(index, index+len(co[j].upper()) )
-            #
-            # index_start = [[int(x) + 1] for x in str(index).zfill(3)]
-            # index_end = [[int(x) + 1] for x in
-            #              str(index + len(co[j].upper())).zfill(3)]
+            index = questions[i].upper().index(co[j].upper())
+            # print(index, index+len(co[j].upper()) )
 
-            co_t = Tfive.t5_tokenize_text([co[j]]) + 20
-            co_t = [[c] for c in co_t[0]]
+            #index_start = [[int(x) + 1] for x in str(index).zfill(3)]
+            #index_end = [[int(x) + 1] for x in
+            #             str(index + len(co[j].upper())).zfill(3)]
+
+            #q_splitted = questions[i].upper().split()
+            #co_splitted = co[j].upper().split()
+
+            #print(co_splitted)
+            #matching = [s for s in q_splitted if co_splitted[0] in s]
+            #index = q_splitted.index(matching[0])
+            # if(len(matching)!=1):
+            #     print(sql[i], questions[i])
+            #     print(matching, index, len(matching))
+            #     print("=======")
+
+            # q_stripped = re.sub(r'[^A-Za-z0-9 ]+', ' ', questions[i].upper())
+            # co_stripped = re.sub(r'[^A-Za-z0-9 ]+', ' ', co[j].upper())
+            # q_stripped = " ".join(q_stripped.split())
+            # co_stripped = " ".join(co_stripped.split())
+            #
+            # q_token = list(Tfive.t5_tokenize_text([q_stripped])[0])
+            # co_t = Tfive.t5_tokenize_text([co_stripped])[0]# + 20
+            #
+            #
+            # print(questions[i])
+            # print(q_token)
+            # #print(co_t)
+            # #c_dec = [Tfive.tokenizer.decode([c]) for c in co_t ]
+            # #print(c_dec)
+            # print(co_stripped,"-----",  q_stripped, "stripeed")
+            # start = q_token.index(co_t[0])
+            # end = q_token.index(co_t[-1])
+            # print(start, end)
+            # print("=======")
+            #exit()
+            #co_t = [[c] for c in co_t[0]]
             #print(co_t, co_t.T.shape)
             #exit()
 
             encoded_conds.extend([
-                [ci[j] + 1],
-                [oi[j] + 1], ])
-            encoded_conds.extend(co_t)
+                [ci[j] + offset],
+                [oi[j] + offset],
+                [index + offset],
+                [index + len(co[j].upper()) +  offset]
+
+            ])
+
             # encoded_conds.extend(index_start)
             # encoded_conds.append(dash)
             # encoded_conds.extend(index_end)
-            if(j!=len(co)-1):
-                encoded_conds.append(comma)
+            # if(j!=len(co)-1):
+            #     encoded_conds.append(comma)
         encoded_conds.append(end)
         if (len(encoded_conds) > maximum_length):
             maximum_length = len(encoded_conds)
@@ -198,7 +235,7 @@ def main(output_filepath):
 
     Tfive = T5()
 
-    max_length = 100
+    max_length = 50
     dataset = load_dataset('wikisql')
 
     train_questions = dataset["train"]["question"][:max_length]

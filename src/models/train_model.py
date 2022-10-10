@@ -33,13 +33,14 @@ def main(data_filepath, model_filepath):
     print(X_validation.shape)
     print(Y_validation.shape)
 
-    #vocab_size = np.max(Y) + 1
-    vocab_size = 32128 + 20
-    print(vocab_size)
+    vocab_size = np.max(Y_train) + 1
+    #print(vocab_size); exit()
+    vocab_size = 200
+    #print(vocab_size)
     print("X_features", X_train.shape)
     print("Y", Y_train.shape)
     Y_output_train = to_categorical(Y_train, vocab_size)
-    Y_output_validation = to_categorical(Y_validation, vocab_size)
+    #Y_output_validation = to_categorical(Y_validation, vocab_size)
     print("Y_output", Y_output_train.shape)
 
     embed_dim = X_train.shape[-1]
@@ -79,15 +80,19 @@ def main(data_filepath, model_filepath):
     print(decoder.summary())
 
     # decoder.fit(data_tr, epochs=2000)
-    epochs = 500
+    epochs = 1000
     X_tr = [X_train, Y_train[:, :-1]]
     Y_tr = Y_output_train[:, 1:, :]
 
-    X_val = [X_validation, Y_validation[:, :-1]]
-    Y_val = Y_output_validation[:, 1:, :]
-    print(Y_val.shape)
+    #X_val = [X_validation, Y_validation[:, :-1]]
+    #Y_val = Y_output_validation[:, 1:, :]
+    #print(Y_val.shape)
 
-    #decoder.fit(X_tr, Y_tr, validation_data = (X_val, Y_val),  batch_size = 64, epochs=2000)
+    decoder.fit(X_tr, Y_tr,  batch_size = batch_size, epochs=200)
+
+    decoder.save(f"{model_filepath}/mdl_tmp.keras")
+    shutil.move(f"{model_filepath}/mdl_tmp.keras",
+                f"{model_filepath}/model.keras")
     with trange(epochs) as t:
         for i in t:
             # loss = decoder.fit(data_tr, batch_size=64, epochs=1, verbose = False)
