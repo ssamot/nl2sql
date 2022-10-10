@@ -62,7 +62,7 @@ def main(data_filepath, model_filepath):
     embedding_layer = TokenAndPositionEmbedding(
         vocabulary_size=vocab_size,
         sequence_length=timesteps,
-        embedding_dim=embed_dim,
+        embedding_dim=256,
     )(decoder_inputs)
 
     x = TransformerDecoder(intermediate_dim=latent_dim,
@@ -70,6 +70,7 @@ def main(data_filepath, model_filepath):
                            dropout=0.2
                            )(embedding_layer, x_encoder)
     # x = keras.layers.Dropout(0.5)(x)
+    x = keras.layers.Dense(256, activation = "relu")(x)
     decoder_outputs = keras.layers.Dense(vocab_size, activation="softmax")(x)
 
     decoder = keras.Model([encoded_seq_inputs, decoder_inputs], decoder_outputs)
@@ -80,7 +81,7 @@ def main(data_filepath, model_filepath):
     print(decoder.summary())
 
     # decoder.fit(data_tr, epochs=2000)
-    epochs = 1000
+    epochs = 500
     X_tr = [X_train, Y_train[:, :-1]]
     Y_tr = Y_output_train[:, 1:, :]
 
@@ -88,7 +89,7 @@ def main(data_filepath, model_filepath):
     #Y_val = Y_output_validation[:, 1:, :]
     #print(Y_val.shape)
 
-    decoder.fit(X_tr, Y_tr,  batch_size = batch_size, epochs=200)
+    decoder.fit(X_tr, Y_tr,  batch_size = batch_size, epochs=epochs)
 
     decoder.save(f"{model_filepath}/mdl_tmp.keras")
     shutil.move(f"{model_filepath}/mdl_tmp.keras",
