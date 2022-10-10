@@ -15,27 +15,20 @@ np.set_printoptions(precision=2)
 @click.argument('model_filepath', type=click.Path(exists=True))
 def main(data_filepath, model_filepath):
 
-    data = np.load(f"{data_filepath}/train.npz", allow_pickle=True)
+    split = "validation"
+    data = np.load(f"{data_filepath}/{split}.npz", allow_pickle=True)
     X_train = data["headers_questions_encoded"]
     Y_train = data["output_encoded"]
 
-    data = np.load(f"{data_filepath}/test.npz", allow_pickle=True)
-    X_test = data["headers_questions_encoded"]
-    Y_test = data["output_encoded"]
+    # data = np.load(f"{data_filepath}/test.npz", allow_pickle=True)
+    # X_test = data["headers_questions_encoded"]
+    # Y_test = data["output_encoded"]
 
     dataset = load_dataset('wikisql')
 
-    train_questions = dataset["train"]["question"]
-    validation_questions = dataset["validation"]["question"]
-    test_questions = dataset["test"]["question"]
-
-    train_table = dataset["train"]["table"]
-    validation_table = dataset["validation"]["table"]
-    test_table = dataset["test"]["table"]
-
-    train_sql = dataset["train"]["sql"]
-    validation_sql = dataset["validation"]["sql"]
-    test_sql = dataset["test"]["sql"]
+    train_questions = dataset[split]["question"]
+    train_table = dataset[split]["table"]
+    train_sql = dataset[split]["sql"]
 
     nn = keras.models.load_model(f"{model_filepath}/model.keras", custom_objects=
     {
@@ -44,7 +37,7 @@ def main(data_filepath, model_filepath):
     })
 
 
-    example = 1
+    example = 100
     print("QUESTION:", train_questions[example])
     print("TABLE:", train_table[example]["header"])
     print("SQL:",train_sql[example])
@@ -56,7 +49,7 @@ def main(data_filepath, model_filepath):
     y_hat = decode_single_sequence(X_train[example:example+1],nn)
     encoded_predicted = code2query(y_hat, train_table[example]["header"],
                train_questions[example])
-    print("Encoded predicted:", encoded_predicted)
+    print("Encoded predicted:   ", encoded_predicted)
 
 def code2query(code, table, question):
     offset = 10

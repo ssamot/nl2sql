@@ -235,7 +235,7 @@ def main(output_filepath):
 
     Tfive = T5()
 
-    max_length = 50
+    max_length = 100000
     dataset = load_dataset('wikisql')
 
     train_questions = dataset["train"]["question"][:max_length]
