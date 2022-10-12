@@ -1,13 +1,15 @@
 from einops import rearrange
 import torch
 import transformers
-from transformers import T5Tokenizer, T5EncoderModel, T5Config
+from transformers import BertTokenizer, BertModel, BertConfig
 transformers.logging.set_verbosity_error()
 import numpy as np
 from datasets import load_dataset
 import random, warnings
 warnings.filterwarnings("ignore")
 import click
+from tensorflow.keras.utils import pad_sequences
+
 
 
 
@@ -17,7 +19,7 @@ np.set_printoptions(precision=2)
 # google/t5-v1_1-base
 
 class T5:
-    def __init__(self, name = 'google/t5-v1_1-base', max_length = 100):
+    def __init__(self, name = 'bert-base-uncased', max_length = 100):
         self.T5_CONFIGS = {}
         self.MAX_LENGTH = max_length
         self.model, self.tokenizer = self.get_model_and_tokenizer(name)
@@ -88,12 +90,12 @@ class T5:
 
 
     def get_tokenizer(self, name):
-        tokenizer = T5Tokenizer.from_pretrained(name, local_files_only=False)
+        tokenizer = BertTokenizer.from_pretrained(name, local_files_only=False)
         return tokenizer
 
 
     def get_model(self, name):
-        model = T5EncoderModel.from_pretrained(name, local_files_only=False)
+        model = BertModel.from_pretrained(name, local_files_only=False)
         return model
 
 
