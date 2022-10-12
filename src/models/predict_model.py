@@ -15,7 +15,7 @@ np.set_printoptions(precision=2)
 @click.argument('model_filepath', type=click.Path(exists=True))
 def main(data_filepath, model_filepath):
 
-    split = "validation"
+    split = "train"
     data = np.load(f"{data_filepath}/{split}.npz", allow_pickle=True)
     X_train = data["headers_questions_encoded"]
     Y_train = data["output_encoded"]
