@@ -41,12 +41,17 @@ train: requirements
 
 ## Train
 train_finetune: requirements
-	PYTHONPATH=src $(PYTHON_INTERPRETER) src/models/train_model_finetune.py data/processed models
+	CUDA_VISIBLE_DEVICES=0,1 PYTHONPATH=src $(PYTHON_INTERPRETER) src/models/train_model_finetune.py data/processed models
 
 
 ## Train
 predict: requirements
 	PYTHONPATH=src $(PYTHON_INTERPRETER) src/models/predict_model.py data/processed models
+
+
+## Train
+predict_finetune: requirements
+	CUDA_VISIBLE_DEVICES=0,1 PYTHONPATH=src $(PYTHON_INTERPRETER) src/models/predict_model_finetune.py data/processed models
 
 
 ## Delete all compiled Python files

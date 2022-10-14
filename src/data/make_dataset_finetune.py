@@ -38,7 +38,7 @@ class Wikidataset(Dataset):
                 "target_ids": target_ids, "target_mask": target_mask}
 
     def _build(self, split):
-        max_length = 1000000
+        max_length = 10000000
         dataset = load_dataset('wikisql')
 
         train_questions = dataset[split]["question"][:max_length]
@@ -51,12 +51,18 @@ class Wikidataset(Dataset):
         inputs = []
 
         for h,q in zip(train_table, train_questions):
-            inputs.append(f"{h['header']}:{q}::")
+            columns = h['header']
+            columns = ",".join(columns)
+            inputs.append(f"::{columns}::{q}:::")
 
         targets = []
 
         for t in train_sql:
-            targets.append(f"{start} {t['human_readable']} {end}")
+            #del t["human_readable"]
+            #print(t)
+            #exit()
+            #targets.append(str(t))
+            targets.append(f"{start} {str(t)} {end}")
 
         encoded_inputs = self.tokenizer.batch_encode_plus(
             inputs,
@@ -82,6 +88,8 @@ class Wikidataset(Dataset):
         self.targets = encoded_targets
 
 
+        print("inputs", split, self.inputs["input_ids"].shape)
+        print("targets", split, self.targets["input_ids"].shape)
 
         torch.save(self.inputs,self.inputs_file)
         torch.save(self.targets,self.targets_file)

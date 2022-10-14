@@ -1,18 +1,14 @@
-import argparse
 import os
+# stop the noise
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import logging
 import click
 import torch
 from torch.utils.data import Dataset, DataLoader
 import pytorch_lightning as pl
 from data.make_dataset_finetune import Wikidataset
-
-from transformers import (
-    AdamW,
-    T5ForConditionalGeneration,
-    T5Tokenizer,
-    get_linear_schedule_with_warmup
-)
+from pytorch_lightning.loggers import CSVLogger
+from transformers import T5ForConditionalGeneration,T5Tokenizer,get_linear_schedule_with_warmup
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +61,7 @@ class T5FineTuner(pl.LightningModule):
 
         tensorboard_logs = {"train_loss": loss}
         return {"loss": loss, "log": tensorboard_logs}
-    #
+
     # def training_epoch_end(self, outputs):
     #     avg_train_loss = torch.stack([x["loss"] for x in outputs]).mean()
     #     tensorboard_logs = {"avg_train_loss": avg_train_loss}
@@ -78,6 +74,7 @@ class T5FineTuner(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
         tensorboard_logs = {"val_loss": avg_loss}
+        print("Validation loss:", avg_loss)
         return {"avg_val_loss": avg_loss, "log": tensorboard_logs,
                 'progress_bar': tensorboard_logs}
 
@@ -98,7 +95,8 @@ class T5FineTuner(pl.LightningModule):
                 "weight_decay": 0.0,
             },
         ]
-        optimizer = AdamW(optimizer_grouped_parameters,
+
+        optimizer = torch.optim.AdamW(optimizer_grouped_parameters,
                           lr=self.hparams.learning_rate,
                           eps=self.hparams.adam_epsilon)
         self.opt = optimizer
@@ -185,11 +183,11 @@ def main(data_filepath, model_filepath):
         weight_decay=0.0,
         adam_epsilon=1e-8,
         warmup_steps=0,
-        train_batch_size=8,
-        eval_batch_size=8,
-        num_train_epochs=2,
+        train_batch_size=16,
+        eval_batch_size=16,
+        num_train_epochs=17,
         gradient_accumulation_steps=16,
-        n_gpu=1,
+        n_gpu=2,
         early_stop_callback=False,
         fp_16=False,
         # if you want to enable 16-bit training then install apex and set this to true
@@ -208,7 +206,7 @@ def main(data_filepath, model_filepath):
 
     train_params = dict(
         accumulate_grad_batches=args["gradient_accumulation_steps"],
-        gpus=args["n_gpu"],
+        #gpus=args["n_gpu"],
         max_epochs=args["num_train_epochs"],
         #early_stop_callback=False,
         precision=16 if args["fp_16"] else 32,
@@ -216,6 +214,8 @@ def main(data_filepath, model_filepath):
         gradient_clip_val= args["max_grad_norm"],
         #checkpoint_callback=checkpoint_callback,
         #callbacks=[LoggingCallback()],
+        accelerator='gpu', devices=2,
+        logger = CSVLogger("./logs")
     )
 
 
@@ -235,13 +235,12 @@ def main(data_filepath, model_filepath):
                                 max_length=100)
 
     dec = [model.tokenizer.decode(ids) for ids in outs]
-
     texts = [model.tokenizer.decode(ids) for ids in batch['source_ids']]
     targets = [model.tokenizer.decode(ids) for ids in batch['target_ids']]
 
     import textwrap
     for i in range(32):
-        lines = textwrap.wrap("Natural language question:\n%s\n" % texts[i].split("::")[0], width=100)
+        lines = textwrap.wrap("Natural language question:\n%s\n" % texts[i].split(":::")[0], width=100)
         print("\n".join(lines))
         print("\nActual SQL: %s" % targets[i].split("/s")[0])
         print("Predicted SQL: %s" % dec[i].split("/s")[0])
