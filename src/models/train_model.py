@@ -26,7 +26,7 @@ def main(data_filepath, model_filepath):
     data = np.load(f"{data_filepath}/train.npz", allow_pickle=True)
     X_train = data["headers_questions_encoded"]
     Y_train = data["output_encoded"]
-    vocab_size = 6
+    vocab_size = 17
     Y_train = to_categorical(Y_train, vocab_size)
     #print(Y_train)
 
@@ -51,7 +51,7 @@ def main(data_filepath, model_filepath):
     x = keras.layers.Flatten()(encoded_seq_inputs)
     x = keras.layers.Dense(1000, activation = "relu")(x)
     #x = keras.layers.Masking()(encoded_seq_inputs)
-    #x = keras.layers.LSTM(1000)(x)
+    #x = keras.layers.LSTM(1000)(x)https://github.com/lucidrains/imagen-pytorch/blob/main/imagen_pytorch/t5.py
     x = keras.layers.Dense(vocab_size, activation = "softmax")(x)
 
     decoder = keras.Model([encoded_seq_inputs], x)

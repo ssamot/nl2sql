@@ -38,10 +38,10 @@ def main(data_filepath, model_filepath):
 
     import textwrap
     for i in range(32):
-        lines = textwrap.wrap("Natural language question:\n%s\n" % texts[i].split(":::")[0], width=100)
+        lines = textwrap.wrap("Natural language question:\n%s\n" % texts[i].split("[END]")[0], width=100)
         print("\n".join(lines))
-        print("\nActual SQL: %s" % targets[i].split("/s")[0])
-        print("Predicted SQL: %s" % dec[i].split("/s")[0])
+        print("\nActual SQL: %s" % targets[i].split("[END_SQL]")[0])
+        print("Predicted SQL: %s" % dec[i].split("[END_SQL]")[0])
         print(
             "=====================================================================\n")
 

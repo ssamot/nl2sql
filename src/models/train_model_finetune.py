@@ -9,18 +9,40 @@ import pytorch_lightning as pl
 from data.make_dataset_finetune import Wikidataset
 from pytorch_lightning.loggers import CSVLogger
 from transformers import T5ForConditionalGeneration,T5Tokenizer,get_linear_schedule_with_warmup
+from pytorch_lightning.strategies.ddp import DDPStrategy
+
 
 logger = logging.getLogger(__name__)
 
 class T5FineTuner(pl.LightningModule):
     def __init__(self, hparams):
         super(T5FineTuner, self).__init__()
-        #self.hparams.update(hparams)
-        for key in hparams.keys():
-            self.hparams[key] = hparams[key]
+        self.hparams.update(hparams)
+        # for key in hparams.keys():
+        #     self.hparams[key] = hparams[key]
+
+        #self.save_hyperparameters()
 
         self.model = T5ForConditionalGeneration.from_pretrained(
             self.hparams.model_name_or_path)
+
+        #self.model.encoder.requires_grad = False
+        # for p in self.model.encoder.parameters():
+        #     p.requires_grad = False
+        #print(self.model.decoder.forward.__code__.co_varnames)
+
+        #decoder_layer = torch.nn.TransformerDecoderLayer(d_model=512, nhead=8, batch_first=True)
+
+        #self.model.decoder = torch.nn.TransformerDecoder(decoder_layer, 1)
+        #print(self.model.decoder.forward.__code__.co_varnames)
+        #exit()
+        model_parameters = filter(lambda p: p.requires_grad, self.model.parameters())
+        import numpy as np
+        params = sum([np.prod(p.size()) for p in model_parameters])
+        print(self.model)
+        print("Trainable params", params)
+        #from torchsummary import summary
+        #exit()
         self.tokenizer = T5Tokenizer.from_pretrained(
             self.hparams.tokenizer_name_or_path)
 
@@ -58,14 +80,10 @@ class T5FineTuner(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss = self._step(batch)
-
         tensorboard_logs = {"train_loss": loss}
         return {"loss": loss, "log": tensorboard_logs}
 
-    # def training_epoch_end(self, outputs):
-    #     avg_train_loss = torch.stack([x["loss"] for x in outputs]).mean()
-    #     tensorboard_logs = {"avg_train_loss": avg_train_loss}
-    #     return None
+
 
     def validation_step(self, batch, batch_idx):
         loss = self._step(batch)
@@ -73,10 +91,13 @@ class T5FineTuner(pl.LightningModule):
 
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
-        tensorboard_logs = {"val_loss": avg_loss}
-        print("Validation loss:", avg_loss)
-        return {"avg_val_loss": avg_loss, "log": tensorboard_logs,
-                'progress_bar': tensorboard_logs}
+        self.model.save_pretrained(f"{self.hparams.model_filepath}/model_t5.model")
+        self.log("avg_val_loss", avg_loss, sync_dist=True)
+
+    def training_epoch_end(self, outputs):
+        avg_train_loss = torch.stack([x["loss"] for x in outputs]).mean()
+        #self.log("avg_train_loss", avg_train_loss,sync_dist=True)
+        return None
 
     def configure_optimizers(self):
         "Prepare optimizer and schedule (linear warmup and decay)"
@@ -135,34 +156,6 @@ class T5FineTuner(pl.LightningModule):
         return DataLoader(val_dataset, batch_size=self.hparams.eval_batch_size,
                           num_workers=4)
 
-
-
-
-
-class LoggingCallback(pl.Callback):
-  def on_validation_end(self, trainer, pl_module):
-    logger.info("***** Validation results *****")
-    if pl_module.is_logger():
-      metrics = trainer.callback_metrics
-      # Log results
-      for key in sorted(metrics):
-        if key not in ["log", "progress_bar"]:
-          logger.info("{} = {}\n".format(key, str(metrics[key])))
-
-  def on_test_end(self, trainer, pl_module):
-    logger.info("***** Test results *****")
-
-    if pl_module.is_logger():
-      metrics = trainer.callback_metrics
-
-      # Log and save results to file
-      output_test_results_file = os.path.join(pl_module.hparams.output_dir, "test_results.txt")
-      with open(output_test_results_file, "w") as writer:
-        for key in sorted(metrics):
-          if key not in ["log", "progress_bar"]:
-            logger.info("{} = {}\n".format(key, str(metrics[key])))
-            writer.write("{} = {}\n".format(key, str(metrics[key])))
-
 @click.command()
 @click.argument('data_filepath', type=click.Path(exists=True))
 @click.argument('model_filepath', type=click.Path(exists=True))
@@ -173,7 +166,7 @@ def main(data_filepath, model_filepath):
 
     args = dict(
         data_dir=data_filepath,  # path for data files
-        output_dir=model_filepath,  # path to save the checkpoints
+        model_filepath=model_filepath,  # path to save the checkpoints
         train_dataset = train_dataset,
         validation_dataset = validation_dataset,
         model_name_or_path='t5-small',
@@ -183,9 +176,9 @@ def main(data_filepath, model_filepath):
         weight_decay=0.0,
         adam_epsilon=1e-8,
         warmup_steps=0,
-        train_batch_size=16,
-        eval_batch_size=16,
-        num_train_epochs=17,
+        train_batch_size=32,
+        eval_batch_size=64,
+        num_train_epochs=128,
         gradient_accumulation_steps=16,
         n_gpu=2,
         early_stop_callback=False,
@@ -206,7 +199,6 @@ def main(data_filepath, model_filepath):
 
     train_params = dict(
         accumulate_grad_batches=args["gradient_accumulation_steps"],
-        #gpus=args["n_gpu"],
         max_epochs=args["num_train_epochs"],
         #early_stop_callback=False,
         precision=16 if args["fp_16"] else 32,
@@ -215,7 +207,8 @@ def main(data_filepath, model_filepath):
         #checkpoint_callback=checkpoint_callback,
         #callbacks=[LoggingCallback()],
         accelerator='gpu', devices=2,
-        logger = CSVLogger("./logs")
+        logger = CSVLogger("./logs"),
+        strategy = DDPStrategy(find_unused_parameters=False),
     )
 
 
@@ -242,8 +235,8 @@ def main(data_filepath, model_filepath):
     for i in range(32):
         lines = textwrap.wrap("Natural language question:\n%s\n" % texts[i].split(":::")[0], width=100)
         print("\n".join(lines))
-        print("\nActual SQL: %s" % targets[i].split("/s")[0])
-        print("Predicted SQL: %s" % dec[i].split("/s")[0])
+        print("\nActual SQL: %s" % targets[i].split("[END_SQL]")[0])
+        print("Predicted SQL: %s" % dec[i].split("[END_SQL]")[0])
         print(
             "=====================================================================\n")
 

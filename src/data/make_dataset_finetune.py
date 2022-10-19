@@ -3,6 +3,7 @@ from transformers import T5Tokenizer
 import torch
 from datasets import load_dataset
 import click
+from copy import deepcopy
 
 class Wikidataset(Dataset):
     def __init__(self, cache_filepath, split,  build,  name ="t5-small", max_len=512):
@@ -38,36 +39,88 @@ class Wikidataset(Dataset):
                 "target_ids": target_ids, "target_mask": target_mask}
 
     def _build(self, split):
-        max_length = 10000000
+        max_length = 1000000
         dataset = load_dataset('wikisql')
 
         train_questions = dataset[split]["question"][:max_length]
         train_table = dataset[split]["table"][:max_length]
         train_sql = dataset[split]["sql"][:max_length]
 
-        start = "<s>"
-        end   = "</s"
+        start = "[START_SQL]"
+        end   = "[END_SQL]"
 
         inputs = []
 
         for h,q in zip(train_table, train_questions):
             columns = h['header']
-            columns = ",".join(columns)
-            inputs.append(f"::{columns}::{q}:::")
+            #columns = ":".join(columns)
+            str_cols = ""
+            for i,col in enumerate(columns):
+                str_cols += f"col{i}:{col}, "
+            #print(str_cols)
+            #exit()
+            input = f"[START]-{str_cols}---{q}-[END]"
+            #print(input)
+            inputs.append(input)
 
         targets = []
 
         for t in train_sql:
-            #del t["human_readable"]
-            #print(t)
+            sel = t["sel"]
+            agg = t["agg"]
+            conds = f"ci:{t['conds']['column_index']}::oi:{t['conds']['operator_index']}:c{t['conds']['condition']}::"
+            target = f"{start} col{sel}:agg{agg}:{conds} {end}"
+            #print(target)
             #exit()
-            #targets.append(str(t))
-            targets.append(f"{start} {str(t)} {end}")
+            #target = f"{start} {t['human_readable']} {end}"
+            targets.append(target)
+
+
+        if(split == "train"):
+            augment = 4
+            print(split)
+
+            import numpy as np
+
+            for i in range(augment):
+                for h, q, t in zip(train_table, train_questions,train_sql):
+
+                    columns = np.array(h['header'])
+                    sample = np.random.choice(len(columns), len(columns), replace=False)
+
+                    columns = columns[sample]
+
+
+
+                    str_cols = ""
+                    for i, col in enumerate(columns):
+                        str_cols += f"col{i}:{col}, "
+                    # print(str_cols)
+                    # exit()
+                    input = f"[START]-{str_cols}---{q}-[END]"
+                    inputs.append(input)
+
+                    sample = list(sample)
+                    sel = sample.index(t["sel"])
+                    agg = t["agg"]
+
+                    new_conds = []
+                    for co in t['conds']['column_index']:
+                        new_conds.append(sample.index(co))
+
+                    conds = f"ci:{new_conds}::oi:{t['conds']['operator_index']}:c{t['conds']['condition']}::"
+                    target = f"{start} col{sel}:agg{agg}:{conds} {end}"
+
+                    #print(input)
+
+                    targets.append(target)
+
+
 
         encoded_inputs = self.tokenizer.batch_encode_plus(
             inputs,
             return_tensors="pt",
-            max_length=self.max_len,
+            #max_length=self.max_len,
             # truncation=True,
             pad_to_max_length=True,
             add_special_tokens=False
@@ -77,7 +130,7 @@ class Wikidataset(Dataset):
         encoded_targets = self.tokenizer.batch_encode_plus(
             targets,
             return_tensors="pt",
-            max_length=self.max_len,
+            #max_length=self.max_len,
             # truncation=True,
             pad_to_max_length=True,
             add_special_tokens=False
