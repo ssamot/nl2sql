@@ -3,26 +3,31 @@ nl2sql
 
 A sample NL2SQL solution
 
-A sample `t5-small` finetuned on wikiSQL. The method used is fairly simple, we treat the problem as seq2Seq translation from natural language to an intermediate language. The project follows standard datascience cookiecutter naming patterns.
+A sample `t5-small` finetuned on wikiSQL. The method used is fairly simple, we treat the problem as seq2Seq translation from natural language to an intermediate language, in the spirit of SeeD (https://arxiv.org/abs/2105.07911). The project follows standard datascience cookiecutter naming patterns. Make targets are as follows.
 
 `make data_finetune`
 `make train_finetune`
 `make predict_finetune`
 
-The output format is a small custom language I've to succinctly express SQL queries. A couple of examples from the validation dataset include: 
+The output format is a small custom language I've created to succinctly express SQL queries. A couple of examples from the validation dataset include:
 
-**Natural language question:** [START]-col0:Iowa State vs., col1:Overall Record, col2:in Ames, col3:at
-Opponents Venue, col4:at Neutral Site, col5:Last 5 Meetings, col6:Last 10 Meetings, col7:Current
-Streak, col8:Since Beginning of Big 12, ---When the value of "since beginning of big 12" is
-synonymous with its' category, what are the in Ames values?-
 
-**Actual SQL:** [START_SQL] 2:0:ci:[8]::oi:[0]:c['Since Beginning of Big 12']::
-**Predicted SQL:** <pad> [START_SQL] 2:0:ci:[8]::oi:[0]:c["Sinda']::
+**Natural language question:** `[START]-col0:District, col1:Total amount of trees, col2:Prevailing types,
+%, col3:Amount of old trees, col4:Amount of trees, that require replacement, ---What is the district
+when prevailing types, % is acer negundo — 30.22 tilia — 18.6 poplar — 15.23?-``
+
+**Actual SQL:** `[START_SQL] 0:0:ci:[2]::oi:[0]:c['Acer negundo — 30.22 Tilia — 18.6 Poplar — 15.23']::`
+
+**Predicted SQL:** `<pad> [START_SQL] 0:0:ci:[2]::oi:[0]:c['Acer Negundo — 30.22 Tilia — 18.6 Poplar — 15.23']::`
+
+
 ---
 
-**Natural language question:** [START]-col0:Year, col1:Division, col2:League, col3:Regular Season,
+**Natural language question:** `[START]-col0:Year, col1:Division, col2:League, col3:Regular Season,
 col4:Playoffs, col5:U.S. Open Cup, ---what's the u.s. open cup status for regular season of 4th,
-atlantic division -
+atlantic division -`
 
-**Actual SQL:** [START_SQL] 5:0:ci:[3]::oi:[0]:c['4th, Atlantic Division']::
-**Predicted SQL:** <pad> [START_SQL] 5:0:ci:[3]::oi:[0]:c['4th, Atlantic Division']::
+**Actual SQL:** `[START_SQL] 5:0:ci:[3]::oi:[0]:c['4th, Atlantic Division']::`
+
+**Predicted SQL:** `<pad> [START_SQL] 5:0:ci:[3]::oi:[0]:c['4th, Atlantic Division']::`
+`
