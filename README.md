@@ -1,15 +1,13 @@
 nl2sql
 ==============================
 
-A sample NL2SQL solution
-
 A sample `t5-small` finetuned on wikiSQL. The method used is fairly simple, we treat the problem as seq2Seq translation from natural language to an intermediate language, in the spirit of SeeD (https://arxiv.org/abs/2105.07911). The project follows standard datascience cookiecutter naming patterns. Make targets are as follows.
 
 `make data_finetune`
 `make train_finetune`
 `make predict_finetune`
 
-The output format is a small custom language I've created to succinctly express SQL queries. A couple of examples from the validation dataset include:
+The output format is a small custom language I've created to succinctly express SQL queries. A couple of examples from the validation dataset are:
 
 
 **Natural language question:** `[START]-col0:District, col1:Total amount of trees, col2:Prevailing types,
