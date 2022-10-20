@@ -1,0 +1,11 @@
+name: NL2DSL3
+channels:
+  - defaults
+dependencies:
+  - python=3.9
+  - cudatoolkit=11.3
+  - torchvision
+  - torchaudio
+  - pytorch
+  - pytorch-lightning
+prefix: /home/ssamot/anaconda3/envs/NL2DSL3
