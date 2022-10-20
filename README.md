@@ -12,7 +12,7 @@ The output format is a small custom language I've created to succinctly express 
 
 **Natural language question:** `[START]-col0:District, col1:Total amount of trees, col2:Prevailing types,
 %, col3:Amount of old trees, col4:Amount of trees, that require replacement, ---What is the district
-when prevailing types, % is acer negundo — 30.22 tilia — 18.6 poplar — 15.23?-``
+when prevailing types, % is acer negundo — 30.22 tilia — 18.6 poplar — 15.23?-`
 
 **Actual SQL:** `[START_SQL] 0:0:ci:[2]::oi:[0]:c['Acer negundo — 30.22 Tilia — 18.6 Poplar — 15.23']::`
 
