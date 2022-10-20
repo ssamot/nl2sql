@@ -10,7 +10,9 @@ from data.make_dataset_finetune import Wikidataset
 from pytorch_lightning.loggers import CSVLogger
 from transformers import T5ForConditionalGeneration,T5Tokenizer,get_linear_schedule_with_warmup
 from pytorch_lightning.strategies.ddp import DDPStrategy
+import numpy as np
 
+# based on this https://github.com/patil-suraj/exploring-T5/blob/master/t5_fine_tuning.ipynb
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +39,7 @@ class T5FineTuner(pl.LightningModule):
         #print(self.model.decoder.forward.__code__.co_varnames)
         #exit()
         model_parameters = filter(lambda p: p.requires_grad, self.model.parameters())
-        import numpy as np
+
         params = sum([np.prod(p.size()) for p in model_parameters])
         print(self.model)
         print("Trainable params", params)
@@ -176,9 +178,9 @@ def main(data_filepath, model_filepath):
         weight_decay=0.0,
         adam_epsilon=1e-8,
         warmup_steps=0,
-        train_batch_size=32,
+        train_batch_size=64,
         eval_batch_size=64,
-        num_train_epochs=128,
+        num_train_epochs=10,
         gradient_accumulation_steps=16,
         n_gpu=2,
         early_stop_callback=False,
@@ -216,29 +218,6 @@ def main(data_filepath, model_filepath):
     trainer.fit(model)
     model.model.save_pretrained(f"{model_filepath}/model_t5.model")
 
-    ######## should go into predict
-
-    loader = DataLoader(validation_dataset, batch_size=32, shuffle=False)
-    it = iter(loader)
-    batch = next(it)
-    print(batch["source_ids"].shape)
-
-    outs = model.model.generate(input_ids=batch['source_ids'],
-                                attention_mask=batch['source_mask'],
-                                max_length=100)
-
-    dec = [model.tokenizer.decode(ids) for ids in outs]
-    texts = [model.tokenizer.decode(ids) for ids in batch['source_ids']]
-    targets = [model.tokenizer.decode(ids) for ids in batch['target_ids']]
-
-    import textwrap
-    for i in range(32):
-        lines = textwrap.wrap("Natural language question:\n%s\n" % texts[i].split(":::")[0], width=100)
-        print("\n".join(lines))
-        print("\nActual SQL: %s" % targets[i].split("[END_SQL]")[0])
-        print("Predicted SQL: %s" % dec[i].split("[END_SQL]")[0])
-        print(
-            "=====================================================================\n")
 
 if __name__ == '__main__':
     main()

@@ -69,7 +69,7 @@ class Wikidataset(Dataset):
             sel = t["sel"]
             agg = t["agg"]
             conds = f"ci:{t['conds']['column_index']}::oi:{t['conds']['operator_index']}:c{t['conds']['condition']}::"
-            target = f"{start} col{sel}:agg{agg}:{conds} {end}"
+            target = f"{start} {sel}:{agg}:{conds} {end}"
             #print(target)
             #exit()
             #target = f"{start} {t['human_readable']} {end}"
@@ -109,7 +109,7 @@ class Wikidataset(Dataset):
                         new_conds.append(sample.index(co))
 
                     conds = f"ci:{new_conds}::oi:{t['conds']['operator_index']}:c{t['conds']['condition']}::"
-                    target = f"{start} col{sel}:agg{agg}:{conds} {end}"
+                    target = f"{start} {sel}:{agg}:{conds} {end}"
 
                     #print(input)
 
